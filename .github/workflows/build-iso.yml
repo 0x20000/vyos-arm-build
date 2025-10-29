@@ -162,7 +162,7 @@ jobs:
           set -e
           # extract ISO image from artifact
           find build -type f -exec cp {} build \;
-          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-amd64.hybrid.iso
           sudo make test-no-interfaces | tee smoketest_make_test_no_interfaces.log
       - uses: actions/upload-artifact@v4
         with:
@@ -195,7 +195,7 @@ jobs:
           set -e
           # extract ISO image from artifact
           find build -type f -exec cp {} build \;
-          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-amd64.hybrid.iso
           sudo make test-interfaces | tee smoketest_make_test_interfaces.log
       - uses: actions/upload-artifact@v4
         with:
@@ -228,7 +228,7 @@ jobs:
           set -e
           # extract ISO image from artifact
           find build -type f -exec cp {} build \;
-          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-amd64.hybrid.iso
           sudo make testc | tee smoketest_make_testc.log
       - uses: actions/upload-artifact@v4
         with:
@@ -261,7 +261,7 @@ jobs:
           set -e
           # extract ISO image from artifact
           find build -type f -exec cp {} build \;
-          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-amd64.hybrid.iso
           sudo make testraid | tee smoketest_make_testraid.log
       - uses: actions/upload-artifact@v4
         with:
@@ -294,7 +294,7 @@ jobs:
           set -e
           # extract ISO image from artifact
           find build -type f -exec cp {} build \;
-          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-amd64.hybrid.iso
           sudo make testtpm | tee smoketest_make_testtpm.log
       - uses: actions/upload-artifact@v4
         with:
