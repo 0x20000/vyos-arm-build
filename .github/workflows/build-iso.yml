@@ -1,0 +1,283 @@
+name: VyOS nightly build
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+
+  workflow_dispatch:
+    inputs:
+      BUILD_BY:
+        description: 'Builder identifier (default: autobuild@vyos.net)'
+        default: '0x20000@noreply.github.com'
+      build_version:
+        description: 'Version number (default: 1.5-rolling-ISO8601-TIMESTAMP)'
+        default: ''
+      SKIP_SMOKETEST_RAID1:
+        description: 'Skip RAID1 Test'
+        required: true
+        type: boolean
+        default: false
+      SKIP_SMOKETEST_CLI:
+        description: 'Skip all CLI based smoketest'
+        required: true
+        type: boolean
+        default: false
+      SKIP_SMOKETEST_CONFIG:
+        description: 'Skip config load test'
+        required: true
+        type: boolean
+        default: false
+      SKIP_SMOKETEST_TPM:
+        description: 'Skip TPM test'
+        required: true
+        type: boolean
+        default: false
+      SKIP_RELEASE_PUBLISHING:
+        description: 'Skip release publishing'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  BUILD_BY: 0x20000@noreply.github.com
+  DEBIAN_MIRROR: http://deb.debian.org/debian/
+  DEBIAN_SECURITY_MIRROR: http://deb.debian.org/debian-security
+  VYOS_MIRROR: https://packages.vyos.net/repositories/current/
+
+jobs:
+  build_generic_iso:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    outputs:
+      BUILD_BY: ${{ steps.set_env_variables.outputs.BUILD_BY }}
+      build_version: ${{ steps.set_env_variables.outputs.build_version }}
+      TIMESTAMP: ${{ steps.set_env_variables.outputs.TIMESTAMP }}
+      generic_image_iso: ${{ steps.build_generic_iso.outputs.generic_image_iso }}
+      generic_image_name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
+
+    steps:
+      ### Initialization ###
+      - uses: actions/checkout@v4
+      - name: "Initialization: set env variables"
+        id: set_env_variables
+        run: |
+          set -x
+          if [ -n "${{ github.event.inputs.BUILD_BY }}" ]; then
+            echo "BUILD_BY=${{ github.event.inputs.BUILD_BY }}" >> $GITHUB_ENV
+          fi
+          if [ -z "${{ github.event.inputs.build_version }}" ]; then
+            echo "build_version=1.5-rolling-$(date -u +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
+          else
+            echo "build_version=${{ github.event.inputs.build_version }}" >> $GITHUB_OUTPUT
+          fi
+          echo "TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          echo "BUILD_BY=$BUILD_BY" >> $GITHUB_OUTPUT
+
+      - name: Checkout vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          # Clone to sub-path required for minisign binary shipped in this repo
+          # This might change with future Debian versions when they ship minisign
+          repository: vyos/vyos-build
+          path: vyos-build
+
+      - name: Build generic ISO image
+        id: build_generic_iso
+        run: |
+          cd vyos-build
+          sudo --preserve-env ./build-vyos-image \
+            --architecture arm64 \
+            --build-by $BUILD_BY \
+            --build-type release \
+            --custom-package vyos-1x-smoketest \
+            --debian-mirror $DEBIAN_MIRROR \
+            --debian-security-mirror $DEBIAN_SECURITY_MIRROR \
+            --version ${{ steps.set_env_variables.outputs.build_version }} \
+            --vyos-mirror $VYOS_MIRROR \
+            generic
+          cd build
+          # Determine image name and iso file
+          echo "generic_image_name=${GENERIC_IMAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "generic_image_iso=${GENERIC_IMAGE_ISO}" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
+          path: |
+            ${{ steps.build_generic_iso.outputs.generic_image_iso }}
+          retention-days: 15
+          if-no-files-found: error
+      - uses: actions/attest-build-provenance@v3
+        with:
+            subject-name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
+            subject-digest: sha256:${{ steps.upload.outputs.artifact-digest }}
+
+  test_smoketest_cli:
+    needs: build_generic_iso
+    runs-on: ubuntu-24.04-arm
+    if: ${{ !inputs.SKIP_SMOKETEST_CLI }}
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    steps:
+      # We need the test script from vyos-build repo
+      - name: Clone vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          repository: vyos/vyos-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_generic_iso.outputs.generic_image_name }}
+          path: build
+      - name: VyOS CLI smoketests (no interfaces)
+        id: test
+        shell: bash
+        run: |
+          set -e
+          # extract ISO image from artifact
+          find build -type f -exec cp {} build \;
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          sudo make test-no-interfaces | tee smoketest_make_test_no_interfaces.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoketest_make_test_no_interfaces
+          path: smoketest_make_test_no_interfaces.log
+          retention-days: 30
+          if-no-files-found: error
+
+  test_interfaces_cli:
+    needs: build_generic_iso
+    runs-on: ubuntu-24.04-arm
+    if: ${{ !inputs.SKIP_SMOKETEST_CLI }}
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    steps:
+      # We need the test script from vyos-build repo
+      - name: Clone vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          repository: vyos/vyos-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_generic_iso.outputs.generic_image_name }}
+          path: build
+      - name: VyOS CLI smoketests (interfaces only)
+        id: test
+        shell: bash
+        run: |
+          set -e
+          # extract ISO image from artifact
+          find build -type f -exec cp {} build \;
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          sudo make test-interfaces | tee smoketest_make_test_interfaces.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoketest_make_test_interfaces
+          path: smoketest_make_test_interfaces.log
+          retention-days: 30
+          if-no-files-found: error
+
+  test_config_load:
+    needs: build_generic_iso
+    runs-on: ubuntu-24.04-arm
+    if: ${{ !inputs.SKIP_SMOKETEST_CONFIG }}
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    steps:
+      # We need the test script from vyos-build repo
+      - name: Clone vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          repository: vyos/vyos-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_generic_iso.outputs.generic_image_name }}
+          path: build
+      - name: VyOS config load tests
+        id: test
+        shell: bash
+        run: |
+          set -e
+          # extract ISO image from artifact
+          find build -type f -exec cp {} build \;
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          sudo make testc | tee smoketest_make_testc.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoketest_make_testc
+          path: smoketest_make_testc.log
+          retention-days: 30
+          if-no-files-found: error
+
+  test_raid1_install:
+    needs: build_generic_iso
+    runs-on: ubuntu-24.04-arm
+    if: ${{ !inputs.SKIP_SMOKETEST_RAID1 }}
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    steps:
+      # We need the test script from vyos-build repo
+      - name: Clone vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          repository: vyos/vyos-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_generic_iso.outputs.generic_image_name }}
+          path: build
+      - name: VyOS RAID1 installation tests
+        id: test
+        shell: bash
+        run: |
+          set -e
+          # extract ISO image from artifact
+          find build -type f -exec cp {} build \;
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          sudo make testraid | tee smoketest_make_testraid.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoketest_make_testraid
+          path: smoketest_make_testraid.log
+          retention-days: 30
+          if-no-files-found: error
+
+  test_encrypted_config_tpm:
+    needs: build_generic_iso
+    runs-on: ubuntu-24.04-arm
+    if: ${{ !inputs.SKIP_SMOKETEST_TPM }}
+    container:
+      image: ghcr.io/0x20000/vyos-build:current
+      options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
+    steps:
+      # We need the test script from vyos-build repo
+      - name: Clone vyos-build repo
+        uses: actions/checkout@v4
+        with:
+          repository: vyos/vyos-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build_generic_iso.outputs.generic_image_name }}
+          path: build
+      - name: VyOS TPM encryption tests
+        id: test
+        shell: bash
+        run: |
+          set -e
+          # extract ISO image from artifact
+          find build -type f -exec cp {} build \;
+          ln -s ${{ needs.build_generic_iso.outputs.generic_image_iso }} build/live-image-arm64.hybrid.iso
+          sudo make testtpm | tee smoketest_make_testtpm.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoketest_make_testtpm
+          path: smoketest_make_testtpm.log
+          retention-days: 30
+          if-no-files-found: error
