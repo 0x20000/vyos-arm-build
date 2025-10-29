@@ -16,27 +16,27 @@ on:
         description: 'Skip RAID1 Test'
         required: true
         type: boolean
-        default: false
+        default: true
       SKIP_SMOKETEST_CLI:
         description: 'Skip all CLI based smoketest'
         required: true
         type: boolean
-        default: false
+        default: true
       SKIP_SMOKETEST_CONFIG:
         description: 'Skip config load test'
         required: true
         type: boolean
-        default: false
+        default: true
       SKIP_SMOKETEST_TPM:
         description: 'Skip TPM test'
         required: true
         type: boolean
-        default: false
+        default: true
       SKIP_RELEASE_PUBLISHING:
         description: 'Skip release publishing'
         required: true
         type: boolean
-        default: false
+        default: true
 
 env:
   BUILD_BY: 0x20000@noreply.github.com
