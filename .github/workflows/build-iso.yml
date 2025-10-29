@@ -101,14 +101,19 @@ jobs:
             generic
           cd build
           # Determine image name and iso file
+          GENERIC_IMAGE_NAME=$(jq --raw-output .artifacts[0] manifest.json | sed -e 's/.iso//')
+          GENERIC_IMAGE_ISO=$(jq --raw-output .artifacts[0] manifest.json)
           echo "generic_image_name=${GENERIC_IMAGE_NAME}" >> $GITHUB_OUTPUT
           echo "generic_image_iso=${GENERIC_IMAGE_ISO}" >> $GITHUB_OUTPUT
+          # Move artifacts to workspace to avoid nested path in artifact archive
+          mv manifest.json ${GENERIC_IMAGE_ISO} ${GENERIC_IMAGE_ISO}.minisig $GITHUB_WORKSPACE
 
       - uses: actions/upload-artifact@v4
         id: upload
         with:
           name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
           path: |
+            manifest.json
             ${{ steps.build_generic_iso.outputs.generic_image_iso }}
           retention-days: 15
           if-no-files-found: error
@@ -116,6 +121,13 @@ jobs:
         with:
             subject-name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
             subject-digest: sha256:${{ steps.upload.outputs.artifact-digest }}
+      - name: create release
+        uses: softprops/action-gh-release@v2.4.1
+        with:
+            files: ${{ steps.build_generic_iso.outputs.generic_image_iso }}
+            name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
+
+
 
   test_smoketest_cli:
     needs: build_generic_iso
