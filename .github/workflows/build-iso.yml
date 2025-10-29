@@ -110,6 +110,8 @@ jobs:
           echo "generic_image_iso=${GENERIC_IMAGE_ISO}" >> $GITHUB_OUTPUT
           # Move artifacts to workspace to avoid nested path in artifact archive
           mv manifest.json ${GENERIC_IMAGE_ISO} $GITHUB_WORKSPACE
+          git tag -a "$GENERIC_IMAGE_NAME" -m "Build $GENERIC_IMAGE_NAME"
+          git push origin "$GENERIC_IMAGE_NAME"
 
       - uses: actions/upload-artifact@v4
         id: upload
@@ -128,6 +130,7 @@ jobs:
         uses: softprops/action-gh-release@v2.4.1
         with:
             files: ${{ steps.build_generic_iso.outputs.generic_image_iso }}
+            tag_name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
             name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
 
 
