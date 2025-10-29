@@ -106,7 +106,7 @@ jobs:
           echo "generic_image_name=${GENERIC_IMAGE_NAME}" >> $GITHUB_OUTPUT
           echo "generic_image_iso=${GENERIC_IMAGE_ISO}" >> $GITHUB_OUTPUT
           # Move artifacts to workspace to avoid nested path in artifact archive
-          mv manifest.json ${GENERIC_IMAGE_ISO} ${GENERIC_IMAGE_ISO}.minisig $GITHUB_WORKSPACE
+          mv manifest.json ${GENERIC_IMAGE_ISO} $GITHUB_WORKSPACE
 
       - uses: actions/upload-artifact@v4
         id: upload
