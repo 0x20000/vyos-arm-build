@@ -125,7 +125,7 @@ jobs:
             subject-name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
             subject-digest: sha256:${{ steps.upload.outputs.artifact-digest }}
       - name: Bump version and push tag
-        uses: laputansoft/github-tag-action@v6.2
+        uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.build_generic_iso.outputs.generic_image_name }}
