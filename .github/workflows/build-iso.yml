@@ -53,7 +53,7 @@ jobs:
       packages: write
       attestations: write
     container:
-      image: ghcr.io/0x20000/vyos-build:current
+      image: ghcr.io/0x20000/vyos-build:rolling
       options: --sysctl net.ipv6.conf.lo.disable_ipv6=0 --privileged
     outputs:
       BUILD_BY: ${{ steps.set_env_variables.outputs.BUILD_BY }}
@@ -64,7 +64,7 @@ jobs:
 
     steps:
       ### Initialization ###
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: "Initialization: set env variables"
         id: set_env_variables
         run: |
@@ -81,7 +81,7 @@ jobs:
           echo "BUILD_BY=$BUILD_BY" >> $GITHUB_OUTPUT
 
       - name: Checkout vyos-build repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Clone to sub-path required for minisign binary shipped in this repo
           # This might change with future Debian versions when they ship minisign
@@ -111,7 +111,7 @@ jobs:
           # Move artifacts to workspace to avoid nested path in artifact archive
           mv manifest.json ${GENERIC_IMAGE_ISO} $GITHUB_WORKSPACE
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         id: upload
         with:
           name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
@@ -120,17 +120,17 @@ jobs:
             ${{ steps.build_generic_iso.outputs.generic_image_iso }}
           retention-days: 15
           if-no-files-found: error
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
             subject-name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
             subject-digest: sha256:${{ steps.upload.outputs.artifact-digest }}
       - name: Bump version and push tag
-        uses: laputansoft/github-tag-action@v4.6
+        uses: laputansoft/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.build_generic_iso.outputs.generic_image_name }}
       - name: create release
-        uses: softprops/action-gh-release@v2.4.1
+        uses: softprops/action-gh-release@v3
         with:
             files: ${{ steps.build_generic_iso.outputs.generic_image_iso }}
             tag_name: ${{ steps.build_generic_iso.outputs.generic_image_name }}
