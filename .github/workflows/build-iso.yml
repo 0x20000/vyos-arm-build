@@ -42,7 +42,7 @@ env:
   BUILD_BY: 0x20000@noreply.github.com
   DEBIAN_MIRROR: http://deb.debian.org/debian/
   DEBIAN_SECURITY_MIRROR: http://deb.debian.org/debian-security
-  VYOS_MIRROR: https://packages.vyos.net/repositories/current/
+  VYOS_MIRROR: https://packages.vyos.net/repositories/rolling/
 
 jobs:
   build_generic_iso:
