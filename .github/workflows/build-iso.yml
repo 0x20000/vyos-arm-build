@@ -128,7 +128,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.build_generic_iso.outputs.generic_image_name }}
+          custom_tag: ${{ steps.build_generic_iso.outputs.generic_image_name }}
       - name: create release
         uses: softprops/action-gh-release@v3
         with:
